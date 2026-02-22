@@ -38,7 +38,7 @@ export default function TradeHistory({ trades }: TradeHistoryProps) {
             </tr>
           </thead>
           <tbody>
-            {trades.map((trade, i) => (
+            {trades.map((trade) => (
               <tr
                 key={trade.id}
                 className="border-t transition-colors hover:bg-gray-50"
