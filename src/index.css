@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Default theme variables — overridden per-tenant */
+:root {
+  --color-primary: #1a3c6e;
+  --color-secondary: #2563eb;
+  --color-accent: #f59e0b;
+  --color-bg: #f0f4f8;
+  --color-surface: #ffffff;
+  --color-border: #e2e8f0;
+  --color-text: #1e293b;
+  --color-muted: #64748b;
+  --font-family: 'Inter', system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  min-height: 100vh;
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-xl border border-brand-border shadow-sm;
+  }
+  .btn-buy {
+    @apply bg-emerald-600 text-white font-semibold rounded-lg px-4 py-2 hover:bg-emerald-700 transition-colors;
+  }
+  .btn-sell {
+    @apply bg-red-600 text-white font-semibold rounded-lg px-4 py-2 hover:bg-red-700 transition-colors;
+  }
+  .badge-buy {
+    @apply bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-0.5 rounded-full;
+  }
+  .badge-sell {
+    @apply bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full;
+  }
+}
