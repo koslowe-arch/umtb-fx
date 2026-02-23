@@ -29,20 +29,33 @@ const SPREADS: Record<string, number> = {
   'GBP/ILS': 0.008,
 };
 
+const RATE_API_URLS = [
+  'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json',
+  'https://latest.currency-api.pages.dev/v1/currencies/usd.json',
+];
+
 async function fetchLiveRates(): Promise<Record<string, number>> {
-  const res = await fetch('https://open.er-api.com/v6/latest/USD');
-  if (!res.ok) throw new Error('HTTP error ' + res.status);
-  const data = await res.json();
-  if (data.result !== 'success') throw new Error('Invalid response from rates API');
-  const r = data.rates as Record<string, number>;
-  return {
-    'USD/ILS': r.ILS,
-    'EUR/USD': 1 / r.EUR,
-    'GBP/USD': 1 / r.GBP,
-    'EUR/ILS': r.ILS / r.EUR,
-    'USD/JPY': r.JPY,
-    'GBP/ILS': r.ILS / r.GBP,
-  };
+  let lastError: Error | null = null;
+  for (const url of RATE_API_URLS) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP error ' + res.status);
+      const data = await res.json();
+      const r = data.usd as Record<string, number>;
+      if (!r) throw new Error('Invalid response from rates API');
+      return {
+        'USD/ILS': r.ils,
+        'EUR/USD': 1 / r.eur,
+        'GBP/USD': 1 / r.gbp,
+        'EUR/ILS': r.ils / r.eur,
+        'USD/JPY': r.jpy,
+        'GBP/ILS': r.ils / r.gbp,
+      };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+  throw lastError;
 }
 
 function randomJitter(value: number, maxPct: number = 0.0015): number {
