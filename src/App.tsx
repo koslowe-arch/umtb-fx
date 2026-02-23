@@ -12,7 +12,7 @@ let tradeCounter = 0;
 export default function App() {
   const [theme, setTheme] = useState<TenantTheme>(themes.default);
   const [activeTenant, setActiveTenant] = useState('default');
-  const pairs = useRates(2000);
+  const { pairs, loading, error } = useRates(2000);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [modal, setModal] = useState<{ pair: CurrencyPair; direction: TradeDirection } | null>(null);
 
@@ -86,9 +86,18 @@ export default function App() {
             Live Rates
           </h1>
           <span className="text-xs" style={{ color: 'var(--color-muted)' }}>
-            Auto-refreshing every 2s
+            {loading ? 'Fetching live rates…' : 'Live · refreshes every 60s'}
           </span>
         </div>
+
+        {error && (
+          <div
+            className="text-xs px-3 py-2 rounded mb-4"
+            style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-muted)', border: '1px solid var(--color-border)' }}
+          >
+            {error}
+          </div>
+        )}
 
         {/* Currency cards grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
