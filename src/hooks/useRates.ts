@@ -12,12 +12,12 @@ const BASE_RATES: Omit<CurrencyPair, 'bid' | 'ask' | 'spread' | 'change24h' | 'c
 
 // Fallback used when the live API is unreachable
 const FALLBACK_MIDS: Record<string, number> = {
-  'USD/ILS': 3.72,
-  'EUR/USD': 1.0845,
-  'GBP/USD': 1.2720,
-  'EUR/ILS': 4.035,
-  'USD/JPY': 149.85,
-  'GBP/ILS': 4.731,
+  'USD/ILS': 3.11,
+  'EUR/USD': 1.0475,
+  'GBP/USD': 1.2630,
+  'EUR/ILS': 3.257,
+  'USD/JPY': 150.20,
+  'GBP/ILS': 3.928,
 };
 
 const SPREADS: Record<string, number> = {
@@ -29,20 +29,45 @@ const SPREADS: Record<string, number> = {
   'GBP/ILS': 0.008,
 };
 
-const RATE_API_URLS = [
+// Frankfurter uses ECB reference rates — free, no key, CORS-friendly
+const FRANKFURTER_URL =
+  'https://api.frankfurter.app/latest?from=USD&to=ILS,EUR,GBP,JPY';
+
+// Fawaz-ahmed CDN as secondary fallback
+const FAWAZ_URLS = [
   'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json',
   'https://latest.currency-api.pages.dev/v1/currencies/usd.json',
 ];
 
 async function fetchLiveRates(): Promise<Record<string, number>> {
+  // Try Frankfurter first
+  try {
+    const res = await fetch(FRANKFURTER_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const r = data.rates as Record<string, number>;
+    if (!r?.ILS) throw new Error('Missing ILS in Frankfurter response');
+    return {
+      'USD/ILS': r.ILS,
+      'EUR/USD': 1 / r.EUR,
+      'GBP/USD': 1 / r.GBP,
+      'EUR/ILS': r.ILS / r.EUR,   // (USD/ILS) / (EUR/USD inverted) = ILS per EUR
+      'USD/JPY': r.JPY,
+      'GBP/ILS': r.ILS / r.GBP,  // (USD/ILS) / (GBP/USD inverted) = ILS per GBP
+    };
+  } catch {
+    // fall through to fawaz-ahmed
+  }
+
+  // Try fawaz-ahmed mirrors
   let lastError: Error | null = null;
-  for (const url of RATE_API_URLS) {
+  for (const url of FAWAZ_URLS) {
     try {
       const res = await fetch(url);
-      if (!res.ok) throw new Error('HTTP error ' + res.status);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       const r = data.usd as Record<string, number>;
-      if (!r) throw new Error('Invalid response from rates API');
+      if (!r) throw new Error('Invalid fawaz response');
       return {
         'USD/ILS': r.ils,
         'EUR/USD': 1 / r.eur,
