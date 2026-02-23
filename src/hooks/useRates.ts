@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { CurrencyPair } from '../types';
 
 const BASE_RATES: Omit<CurrencyPair, 'bid' | 'ask' | 'spread' | 'change24h' | 'changePercent'>[] = [
@@ -10,7 +10,8 @@ const BASE_RATES: Omit<CurrencyPair, 'bid' | 'ask' | 'spread' | 'change24h' | 'c
   { id: 'GBP/ILS', base: 'GBP', quote: 'ILS' },
 ];
 
-const MID_PRICES: Record<string, number> = {
+// Fallback used when the live API is unreachable
+const FALLBACK_MIDS: Record<string, number> = {
   'USD/ILS': 3.72,
   'EUR/USD': 1.0845,
   'GBP/USD': 1.2720,
@@ -27,6 +28,22 @@ const SPREADS: Record<string, number> = {
   'USD/JPY': 0.03,
   'GBP/ILS': 0.008,
 };
+
+async function fetchLiveRates(): Promise<Record<string, number>> {
+  const res = await fetch('https://open.er-api.com/v6/latest/USD');
+  if (!res.ok) throw new Error('HTTP error ' + res.status);
+  const data = await res.json();
+  if (data.result !== 'success') throw new Error('Invalid response from rates API');
+  const r = data.rates as Record<string, number>;
+  return {
+    'USD/ILS': r.ILS,
+    'EUR/USD': 1 / r.EUR,
+    'GBP/USD': 1 / r.GBP,
+    'EUR/ILS': r.ILS / r.EUR,
+    'USD/JPY': r.JPY,
+    'GBP/ILS': r.ILS / r.GBP,
+  };
+}
 
 function randomJitter(value: number, maxPct: number = 0.0015): number {
   const delta = value * maxPct * (Math.random() * 2 - 1);
@@ -46,22 +63,43 @@ function buildPairs(mids: Record<string, number>): CurrencyPair[] {
 }
 
 export function useRates(intervalMs = 2000) {
-  const [mids] = useState<Record<string, number>>(() => ({ ...MID_PRICES }));
-  const [pairs, setPairs] = useState<CurrencyPair[]>(() => buildPairs(mids));
+  const mids = useRef<Record<string, number>>({ ...FALLBACK_MIDS });
+  const [pairs, setPairs] = useState<CurrencyPair[]>(() => buildPairs(mids.current));
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const tick = useCallback(() => {
-    const updated: Record<string, number> = {};
-    for (const key of Object.keys(mids)) {
-      updated[key] = randomJitter(mids[key]);
-      mids[key] = updated[key];
+  const loadLiveRates = useCallback(async () => {
+    try {
+      const live = await fetchLiveRates();
+      Object.assign(mids.current, live);
+      setPairs(buildPairs(mids.current));
+      setError(null);
+    } catch {
+      setError('Live rates unavailable — showing cached rates');
+    } finally {
+      setLoading(false);
     }
-    setPairs(buildPairs(mids));
-  }, [mids]);
+  }, []);
+
+  // Fetch on mount and refresh every 60 seconds
+  useEffect(() => {
+    loadLiveRates();
+    const id = setInterval(loadLiveRates, 60_000);
+    return () => clearInterval(id);
+  }, [loadLiveRates]);
+
+  // Tick jitter for live-trading feel between API refreshes
+  const tick = useCallback(() => {
+    for (const key of Object.keys(mids.current)) {
+      mids.current[key] = randomJitter(mids.current[key]);
+    }
+    setPairs(buildPairs(mids.current));
+  }, []);
 
   useEffect(() => {
     const id = setInterval(tick, intervalMs);
     return () => clearInterval(id);
   }, [tick, intervalMs]);
 
-  return pairs;
+  return { pairs, loading, error };
 }
